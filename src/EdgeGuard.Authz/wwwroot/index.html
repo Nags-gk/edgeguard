@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EdgeGuard Console</title>
+<meta name="description" content="Identity-aware secure access gateway: Envoy data path with a C# external authorization service.">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#16181d;--muted:#5d6472;--line:#e3e6eb;--accent:#2457d6;--ok:#13804a;--okbg:#e5f5ec;--deny:#b42318;--denybg:#fdecea;--warn:#a15c00;--warnbg:#fff4e0;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--panel:#171a21;--ink:#e8eaee;--muted:#9aa3b2;--line:#2a2f3a;--accent:#7aa2ff;--ok:#4ade80;--okbg:#10291b;--deny:#f87171;--denybg:#2d1414;--warn:#fbbf24;--warnbg:#2b2210}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{padding:20px 24px 12px;border-bottom:1px solid var(--line);background:var(--panel)}
+h1{margin:0;font-size:20px;letter-spacing:-.01em}h1 small{font-weight:400;color:var(--muted);font-size:14px;margin-left:8px}
+.badges{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}.badge{font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:99px;color:var(--muted)}
+.badge b{color:var(--ink)}
+main>div{min-width:0}
+main{display:grid;grid-template-columns:300px 1fr 380px;gap:16px;padding:16px 24px;max-width:1500px;margin:0 auto}
+@media (max-width:1150px){main{grid-template-columns:1fr}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+.persona{border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:8px;cursor:pointer}
+.persona.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.persona .n{font-weight:600}.persona .s{color:var(--muted);font-size:12px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}.chip{font-size:11px;padding:0 6px;border-radius:4px;background:var(--bg);border:1px solid var(--line)}
+.chip.ok{color:var(--ok)}.chip.bad{color:var(--deny)}
+button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--accent)}button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+select{font:inherit;padding:5px 8px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.result{border:1px solid var(--line);border-radius:8px;padding:10px;margin-top:6px}
+.result.allow{background:var(--okbg);border-color:transparent}.result.deny{background:var(--denybg);border-color:transparent}.result.warn{background:var(--warnbg);border-color:transparent}
+.verdict{font-weight:700}.allow .verdict{color:var(--ok)}.deny .verdict{color:var(--deny)}.warn .verdict{color:var(--warn)}
+pre{font:12px/1.45 var(--mono);white-space:pre-wrap;word-break:break-word;margin:6px 0 0;max-height:260px;overflow:auto}
+table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}
+td.c-allow{color:var(--ok);font-weight:600}td.c-deny,td.c-unauthenticated{color:var(--deny);font-weight:600}
+.feed{max-height:520px;overflow:auto}.feed table{min-width:520px}.feed td{font-family:var(--mono);font-size:11px}
+.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:8px}.kpi .v{font-size:18px;font-weight:700}.kpi .l{font-size:11px;color:var(--muted)}
+.muted{color:var(--muted)}a{color:var(--accent)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px}.bar>i{display:block;height:100%;background:var(--accent)}
+details summary{cursor:pointer;color:var(--muted)}
+footer{padding:4px 24px 24px;color:var(--muted);font-size:12px;max-width:1500px;margin:0 auto}
+</style>
+</head>
+<body>
+<header>
+  <h1>EdgeGuard<small>identity-aware secure access gateway</small></h1>
+  <div class="badges">
+    <span class="badge">Data path <b>Envoy</b> + ext_authz (gRPC)</span>
+    <span class="badge">Policy engine <b>C# / .NET 8</b></span>
+    <span class="badge" id="b-entra">Microsoft Entra ID <b>…</b></span>
+    <span class="badge" id="b-policy">Policy <b>…</b></span>
+    <span class="badge"><a href="https://github.com/Nags-gk/edgeguard">Source on GitHub</a></span>
+  </div>
+</header>
+
+<main>
+  <div>
+    <section>
+      <h2>1 · Pick an identity</h2>
+      <div id="personas" class="muted">Loading…</div>
+      <div id="entra-box" style="display:none;margin-top:8px">
+        <button id="entra-btn" class="primary" style="width:100%">Sign in with Microsoft Entra ID</button>
+        <div id="entra-who" class="muted" style="font-size:12px;margin-top:4px"></div>
+      </div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>2 · Send a request through the gateway</h2>
+      <div class="row" id="targets"></div>
+      <div class="row">
+        <label class="muted">Token</label>
+        <select id="tamper">
+          <option value="">valid</option>
+          <option value="expired">expired</option>
+          <option value="wrong_audience">wrong audience</option>
+          <option value="none">no token</option>
+        </select>
+        <label class="muted">Device</label>
+        <select id="device"><option value="send">send device token</option><option value="omit">omit device token</option></select>
+      </div>
+      <div id="result" class="muted">Choose a persona and a destination.</div>
+    </section>
+
+    <section style="margin-top:16px">
+      <h2>3 · Run the full access matrix</h2>
+      <div class="row"><button id="matrix-btn" class="primary">Run every persona × destination</button><span class="muted" id="matrix-note"></span></div>
+      <div id="matrix"></div>
+    </section>
+
+    <section style="margin-top:16px">
+      <h2>4 · Simulate a compromised session</h2>
+      <p class="muted" style="margin-top:0">Fires 80 rapid requests as the selected persona at a forbidden app. Session risk climbs from velocity and repeated denials: medium risk demands MFA, high risk blocks everything.</p>
+      <div class="row"><button id="burst-btn">Run burst</button><span id="burst-note" class="muted"></span></div>
+      <div id="burst"></div>
+    </section>
+  </div>
+
+  <div>
+    <section>
+      <h2>Live telemetry</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="k-total">–</div><div class="l">decisions</div></div>
+        <div class="kpi"><div class="v" id="k-p50">–</div><div class="l">Check p50 (ms)</div></div>
+        <div class="kpi"><div class="v" id="k-p99">–</div><div class="l">Check p99 (ms)</div></div>
+      </div>
+      <div class="muted" style="font-size:12px">Allowed share of recent decisions</div>
+      <div class="bar"><i id="k-allow" style="width:0"></i></div>
+      <div class="muted" style="font-size:12px;margin-top:6px">Token cache hit rate <b id="k-cache">–</b> · <a href="/metrics">Prometheus metrics</a> · <a href="/envoy/stats">Envoy stats</a></div>
+      <div class="feed" style="margin-top:10px"><table><thead><tr><th>time</th><th>who</th><th>path</th><th>verdict</th><th>reason</th><th>risk</th></tr></thead><tbody id="feed"></tbody></table></div>
+    </section>
+    <section style="margin-top:16px">
+      <details><summary>Active access policy</summary><pre id="policy"></pre></details>
+    </section>
+  </div>
+</main>
+<footer>
+  Demo personas use a separate demo issuer so anyone can exercise every policy path; real users sign in through Microsoft Entra ID.
+  All applications and internet destinations behind the gateway are simulated. Nothing here touches real data.
+</footer>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const TARGETS = [
+  ["HR Portal", "/apps/hr"], ["Finance", "/apps/finance"], ["Wiki", "/apps/wiki"], ["Wiki (flaky upstream)", "/apps/wiki/flaky"],
+  ["Status (public)", "/apps/status"], ["news.example", "/internet/news.example/"], ["github.com", "/internet/github.com/"],
+  ["casino.example", "/internet/casino.example/"], ["malware.test", "/internet/malware.test/"],
+];
+let personas = [], selected = "alice", entraToken = null, config = {};
+const tokenCache = new Map();
+
+async function demoToken(persona, tamper) {
+  const key = persona + "|" + (tamper || "");
+  const hit = tokenCache.get(key);
+  if (hit && hit.until > Date.now()) return hit.t;
+  const r = await fetch("/api/demo/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ persona, tamper: tamper || null }) });
+  if (!r.ok) throw new Error("token endpoint " + r.status);
+  const t = await r.json();
+  tokenCache.set(key, { t, until: Date.now() + 10 * 60 * 1000 });
+  return t;
+}
+
+async function send(persona, path, opts = {}) {
+  const headers = {};
+  if (persona === "entra") {
+    if (entraToken) headers.authorization = "Bearer " + entraToken;
+  } else if (opts.tamper !== "none") {
+    const t = await demoToken(persona, opts.tamper);
+    headers.authorization = "Bearer " + t.accessToken;
+    if (t.deviceToken && opts.device !== "omit") headers["x-device-token"] = t.deviceToken;
+  }
+  const started = performance.now();
+  const r = await fetch(path, { headers });
+  const ms = performance.now() - started;
+  let body = await r.text();
+  try { body = JSON.parse(body); } catch {}
+  return { status: r.status, ms, body, decisionId: r.headers.get("x-eg-decision-id") };
+}
+
+function renderPersonas() {
+  $("personas").innerHTML = personas.map((p) => `
+    <div class="persona ${p.key === selected ? "sel" : ""}" data-k="${esc(p.key)}">
+      <div class="n">${esc(p.name)}</div><div class="s">${esc(p.story)}</div>
+      <div class="chips">${p.groups.map((g) => `<span class="chip">${esc(g)}</span>`).join("")}
+        <span class="chip ${p.mfa ? "ok" : "bad"}">${p.mfa ? "MFA" : "no MFA"}</span>
+        <span class="chip ${p.device?.compliant ? "ok" : "bad"}">${p.device ? (p.device.compliant ? "compliant " : "unmanaged ") + esc(p.device.os) : "no device"}</span></div>
+    </div>`).join("");
+  document.querySelectorAll(".persona").forEach((el) => el.onclick = () => { selected = el.dataset.k; renderPersonas(); });
+}
+
+function verdictOf(res) {
+  if (res.status === 200) return ["allow", "ALLOW"];
+  if (res.status === 401) return ["deny", "401 UNAUTHENTICATED"];
+  if (res.status === 403) return ["deny", "403 DENY"];
+  if (res.status === 429) return ["warn", "429 RATE LIMITED"];
+  return ["warn", String(res.status)];
+}
+
+async function runOne(path) {
+  $("result").innerHTML = '<span class="muted">Sending…</span>';
+  try {
+    const res = await send(selected, path, { tamper: $("tamper").value, device: $("device").value });
+    const [cls, label] = verdictOf(res);
+    const b = res.body;
+    const why = typeof b === "object" ? (b.message || (b.content ? `${b.content.app}: ${b.content.data}` : "")) : b;
+    $("result").innerHTML = `<div class="result ${cls}"><span class="verdict">${label}</span> · ${esc(path)} · ${res.ms.toFixed(1)} ms round trip
+      <div>${esc(why)}</div>
+      ${b?.seenByUpstream ? `<div class="muted" style="margin-top:4px">What the upstream app received (tokens stripped at the edge):</div>` : ""}
+      <pre>${esc(JSON.stringify(b?.seenByUpstream ?? b, null, 2))}</pre></div>`;
+  } catch (e) { $("result").textContent = "Error: " + e.message; }
+}
+
+async function runMatrix() {
+  $("matrix-btn").disabled = true; $("matrix-note").textContent = "Running…";
+  const keys = personas.map((p) => p.key).concat(entraToken ? ["entra"] : []);
+  const rows = [];
+  for (const k of keys) {
+    const cells = [];
+    for (const [, path] of TARGETS) {
+      const res = await send(k, path, {});
+      cells.push({ res, reason: res.status === 200 ? "allow" : (res.body?.reason ?? res.status) });
+    }
+    rows.push({ k, cells });
+  }
+  $("matrix").innerHTML = `<table><thead><tr><th></th>${TARGETS.map(([n]) => `<th>${esc(n)}</th>`).join("")}</tr></thead><tbody>${
+    rows.map((r) => `<tr><th>${esc(r.k)}</th>${r.cells.map((c) => `<td class="c-${c.res.status === 200 ? "allow" : "deny"}">${esc(c.reason)}</td>`).join("")}</tr>`).join("")
+  }</tbody></table>`;
+  $("matrix-note").textContent = `${rows.length * TARGETS.length} requests, each decided by policy at the edge.`;
+  $("matrix-btn").disabled = false;
+}
+
+async function runBurst() {
+  if (selected === "entra") return;
+  $("burst-btn").disabled = true; $("burst-note").textContent = "Firing…";
+  const t = await demoToken(selected);
+  const h = { authorization: "Bearer " + t.accessToken }; if (t.deviceToken) h["x-device-token"] = t.deviceToken;
+  const counts = {};
+  await Promise.all(Array.from({ length: 80 }, async () => {
+    const r = await fetch("/apps/finance", { headers: h });
+    let reason = String(r.status);
+    try { reason = (await r.json()).reason ?? "allow"; } catch {}
+    counts[reason] = (counts[reason] || 0) + 1;
+  }));
+  const subj = "demo-" + selected;
+  const ev = await (await fetch(`/api/decisions?subject=${subj}&limit=80`)).json();
+  const risks = {}; ev.forEach((e) => risks[e.risk] = (risks[e.risk] || 0) + 1);
+  $("burst").innerHTML = `<table><tr><th>Outcome</th><th>Count</th></tr>${Object.entries(counts).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join("")}</table>
+    <div class="muted" style="margin-top:6px">Risk levels seen across those decisions: ${Object.entries(risks).map(([k, v]) => `${esc(k)} ${v}`).join(" · ")}. Risk decays after 60 s of normal behavior.</div>`;
+  $("burst-note").textContent = ""; $("burst-btn").disabled = false;
+}
+
+async function refresh() {
+  try {
+    const [s, d] = await Promise.all([fetch("/api/stats").then((r) => r.json()), fetch("/api/decisions?limit=40").then((r) => r.json())]);
+    $("k-total").textContent = s.total.toLocaleString();
+    $("k-p50").textContent = s.checkLatencyMs.p50.toFixed(2);
+    $("k-p99").textContent = s.checkLatencyMs.p99.toFixed(2);
+    $("k-cache").textContent = (s.tokenCacheHitRate * 100).toFixed(0) + "%";
+    const allow = s.byVerdict.allow || 0; $("k-allow").style.width = (s.window ? (allow / s.window) * 100 : 0) + "%";
+    $("feed").innerHTML = d.map((e) => `<tr><td>${esc(e.ts.slice(11, 19))}</td><td>${esc(e.subject.replace("demo-", ""))}</td><td>${esc(e.path)}</td>
+      <td class="c-${esc(e.verdict)}">${esc(e.verdict)}</td><td>${esc(e.reasonCode)}</td><td>${esc(e.risk)}</td></tr>`).join("");
+  } catch {}
+}
+
+async function setupEntra() {
+  if (!config.entraEnabled || !config.clientId) { $("b-entra").innerHTML = "Microsoft Entra ID <b>not configured</b>"; return; }
+  $("b-entra").innerHTML = "Microsoft Entra ID <b>live</b>";
+  $("entra-box").style.display = "block";
+  await new Promise((ok, bad) => { const s = document.createElement("script"); s.src = "https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.27.0/lib/msal-browser.min.js"; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+  const msal = new window.msal.PublicClientApplication({ auth: { clientId: config.clientId, authority: `https://login.microsoftonline.com/${config.tenantId}`, redirectUri: location.origin + "/" }, cache: { cacheLocation: "sessionStorage" } });
+  await msal.initialize();
+  const after = await msal.handleRedirectPromise().catch(() => null);
+  const account = after?.account ?? msal.getAllAccounts()[0];
+  const acquire = async (acc) => {
+    const r = await msal.acquireTokenSilent({ scopes: [config.scope], account: acc }).catch(() => msal.acquireTokenPopup({ scopes: [config.scope] }));
+    entraToken = r.accessToken;
+    $("entra-who").textContent = "Signed in as " + (r.account?.username ?? "") + ". Selected as the active identity.";
+    personas = personas.filter((p) => p.key !== "entra").concat([{ key: "entra", name: "You (Microsoft Entra ID)", story: r.account?.username ?? "", groups: ["from token"], mfa: true, device: null }]);
+    selected = "entra"; renderPersonas();
+  };
+  if (account) await acquire(account);
+  $("entra-btn").onclick = async () => { const r = await msal.loginPopup({ scopes: [config.scope] }); await acquire(r.account); };
+}
+
+(async function init() {
+  $("targets").innerHTML = TARGETS.map(([n, p]) => `<button data-p="${esc(p)}">${esc(n)}</button>`).join("");
+  document.querySelectorAll("#targets button").forEach((b) => b.onclick = () => runOne(b.dataset.p));
+  $("matrix-btn").onclick = runMatrix; $("burst-btn").onclick = runBurst;
+  config = await fetch("/api/config").then((r) => r.json());
+  $("b-policy").innerHTML = `Policy <b>v${config.policyVersion}</b>`;
+  personas = await fetch("/api/personas").then((r) => r.json());
+  renderPersonas();
+  $("policy").textContent = await fetch("/api/policy").then((r) => r.text());
+  setupEntra().catch((e) => { $("b-entra").innerHTML = "Microsoft Entra ID <b>unavailable</b>"; console.warn(e); });
+  refresh(); setInterval(refresh, 2500);
+})();
+</script>
+</body>
+</html>

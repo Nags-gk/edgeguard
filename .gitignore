@@ -1,0 +1,10 @@
+bin/
+obj/
+TestResults/
+*.trx
+loadtest/results-*.json
+loadtest/ci-summary.json
+.pytest_cache/
+__pycache__/
+.vscode/
+.idea/

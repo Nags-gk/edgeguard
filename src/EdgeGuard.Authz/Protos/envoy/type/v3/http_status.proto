@@ -1,0 +1,17 @@
+syntax = "proto3";
+package envoy.type.v3;
+option csharp_namespace = "Envoy.Type.V3";
+// Subset of envoy/type/v3/http_status.proto (wire-compatible: same enum values).
+enum StatusCode {
+  Empty = 0;
+  OK = 200;
+  BadRequest = 400;
+  Unauthorized = 401;
+  Forbidden = 403;
+  TooManyRequests = 429;
+  InternalServerError = 500;
+  ServiceUnavailable = 503;
+}
+message HttpStatus {
+  StatusCode code = 1;
+}

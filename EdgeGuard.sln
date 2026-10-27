@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{EAE98ED1-E315-43C0-B40D-E0C877C775BF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EdgeGuard.Authz", "src\EdgeGuard.Authz\EdgeGuard.Authz.csproj", "{FDC9891C-B4FE-48FA-A48F-389A76C6E7A7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{B772BA0E-5C77-4F17-8473-EF94B13989E3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EdgeGuard.Authz.Tests", "tests\EdgeGuard.Authz.Tests\EdgeGuard.Authz.Tests.csproj", "{425ECD73-C16B-433F-8267-E2872310A12A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FDC9891C-B4FE-48FA-A48F-389A76C6E7A7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDC9891C-B4FE-48FA-A48F-389A76C6E7A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDC9891C-B4FE-48FA-A48F-389A76C6E7A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDC9891C-B4FE-48FA-A48F-389A76C6E7A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{425ECD73-C16B-433F-8267-E2872310A12A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{425ECD73-C16B-433F-8267-E2872310A12A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{425ECD73-C16B-433F-8267-E2872310A12A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{425ECD73-C16B-433F-8267-E2872310A12A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{FDC9891C-B4FE-48FA-A48F-389A76C6E7A7} = {EAE98ED1-E315-43C0-B40D-E0C877C775BF}
+		{425ECD73-C16B-433F-8267-E2872310A12A} = {B772BA0E-5C77-4F17-8473-EF94B13989E3}
+	EndGlobalSection
+EndGlobal

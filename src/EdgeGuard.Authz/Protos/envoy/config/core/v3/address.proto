@@ -1,0 +1,20 @@
+syntax = "proto3";
+package envoy.config.core.v3;
+option csharp_namespace = "Envoy.Config.Core.V3";
+// Subset of envoy/config/core/v3/address.proto (same field numbers).
+message SocketAddress {
+  enum Protocol { TCP = 0; UDP = 1; }
+  Protocol protocol = 1;
+  string address = 2;
+  uint32 port_value = 3;
+  string named_port = 4;
+}
+message Pipe {
+  string path = 1;
+}
+message Address {
+  oneof address {
+    SocketAddress socket_address = 1;
+    Pipe pipe = 2;
+  }
+}

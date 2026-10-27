@@ -1,0 +1,33 @@
+syntax = "proto3";
+package envoy.service.auth.v3;
+import "envoy/config/core/v3/base.proto";
+import "envoy/type/v3/http_status.proto";
+import "envoy/service/auth/v3/attribute_context.proto";
+import "google/rpc/status.proto";
+import "google/protobuf/struct.proto";
+option csharp_namespace = "Envoy.Service.Auth.V3";
+// Subset of envoy/service/auth/v3/external_auth.proto (same service path and field numbers).
+service Authorization {
+  rpc Check(CheckRequest) returns (CheckResponse);
+}
+message CheckRequest {
+  AttributeContext attributes = 1;
+}
+message DeniedHttpResponse {
+  envoy.type.v3.HttpStatus status = 1;
+  repeated envoy.config.core.v3.HeaderValueOption headers = 2;
+  string body = 3;
+}
+message OkHttpResponse {
+  repeated envoy.config.core.v3.HeaderValueOption headers = 2;
+  repeated string headers_to_remove = 5;
+  repeated envoy.config.core.v3.HeaderValueOption response_headers_to_add = 6;
+}
+message CheckResponse {
+  google.rpc.Status status = 1;
+  oneof http_response {
+    DeniedHttpResponse denied_response = 2;
+    OkHttpResponse ok_response = 3;
+  }
+  google.protobuf.Struct dynamic_metadata = 4;
+}

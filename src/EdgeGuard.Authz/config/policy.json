@@ -1,0 +1,45 @@
+{
+  // Zero Trust default: an authenticated request that no policy grants is denied.
+  "defaultAllowAuthenticated": false,
+  "apps": [
+    { "id": "hr",      "name": "HR Portal",        "pathPrefix": "/apps/hr",      "sensitivity": "high" },
+    { "id": "finance", "name": "Finance Ledger",   "pathPrefix": "/apps/finance", "sensitivity": "high" },
+    { "id": "wiki",    "name": "Engineering Wiki", "pathPrefix": "/apps/wiki" },
+    { "id": "status",  "name": "Status Page",      "pathPrefix": "/apps/status",  "allowAnonymous": true }
+  ],
+  "policies": [
+    { "name": "Block high-risk sessions",
+      "assignment": { "minRisk": "High" },
+      "grant": { "block": true } },
+    { "name": "Require MFA for medium-risk sessions",
+      "assignment": { "minRisk": "Medium" },
+      "grant": { "requireMfa": true } },
+    { "name": "HR Portal: HR group, MFA and compliant device",
+      "assignment": { "includeApps": ["hr"] },
+      "grant": { "requireAnyGroup": ["HR"], "requireMfa": true, "requireCompliantDevice": true } },
+    { "name": "Finance Ledger: Finance group, MFA and compliant device",
+      "assignment": { "includeApps": ["finance"] },
+      "grant": { "requireAnyGroup": ["Finance"], "requireMfa": true, "requireCompliantDevice": true } },
+    { "name": "Engineering Wiki: employees",
+      "assignment": { "includeApps": ["wiki"] },
+      "grant": { "requireAnyGroup": ["Employees"] } },
+    { "name": "Internet access: employees and contractors",
+      "assignment": { "internetTraffic": true },
+      "grant": { "requireAnyGroup": ["Employees", "Contractors"] } }
+  ],
+  "webFilter": {
+    "internetPathPrefix": "/internet/",
+    "categories": {
+      "casino.example": "gambling",
+      "slots.example": "gambling",
+      "malware.test": "malware",
+      "phish.test": "phishing",
+      "social.example": "social",
+      "news.example": "news",
+      "github.com": "developer",
+      "microsoft.com": "business"
+    },
+    "blockedCategories": ["gambling", "malware", "phishing"],
+    "groupExceptions": { "Security": ["malware", "phishing"] }
+  }
+}
