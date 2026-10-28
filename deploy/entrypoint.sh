@@ -4,7 +4,7 @@
 set -u
 dotnet /app/EdgeGuard.Authz.dll &
 AUTHZ=$!
-for _ in $(seq 1 100); do
+for _ in $(seq 1 400); do  # up to 40 s: authz loads Entra keys before listening
   (exec 3<>/dev/tcp/127.0.0.1/9002) 2>/dev/null && break
   sleep 0.1
 done

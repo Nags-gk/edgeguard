@@ -57,6 +57,17 @@ public sealed class TokenValidator
     }
 
     public bool EntraEnabled => _entra.Enabled;
+
+    /// <summary>
+    /// Fetch the tenant's OIDC metadata and signing keys before taking traffic, so the first
+    /// Entra request does not pay for discovery inside Envoy's ext_authz time budget.
+    /// </summary>
+    public async Task<int> WarmUpAsync(CancellationToken ct = default)
+    {
+        if (_entraConfig is null) return 0;
+        var cfg = await _entraConfig.GetConfigurationAsync(ct);
+        return cfg.SigningKeys.Count;
+    }
     public string EntraTenant => _entra.TenantId;
 
     public async Task<TokenResult> ValidateUserAsync(string? token, CancellationToken ct = default)

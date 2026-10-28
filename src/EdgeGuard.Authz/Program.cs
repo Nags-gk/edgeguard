@@ -48,6 +48,33 @@ if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP
 var app = builder.Build();
 app.Services.GetRequiredService<PolicyStore>(); // fail fast on a bad policy file
 
+// Load Entra signing keys before Envoy starts sending traffic (the entrypoint waits for /healthz).
+var validator = app.Services.GetRequiredService<TokenValidator>();
+if (validator.EntraEnabled)
+{
+    for (var attempt = 1; ; attempt++)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var keys = await validator.WarmUpAsync(cts.Token);
+            app.Logger.LogInformation("Microsoft Entra tenant {Tenant}: loaded {Keys} signing keys", validator.EntraTenant, keys);
+            break;
+        }
+        catch (Exception e) when (attempt < 3)
+        {
+            app.Logger.LogWarning(e, "Entra metadata fetch failed (attempt {Attempt}); retrying", attempt);
+            await Task.Delay(TimeSpan.FromSeconds(attempt));
+        }
+        catch (Exception e)
+        {
+            // Keep serving demo identities; Entra requests will retry discovery on demand.
+            app.Logger.LogError(e, "Entra metadata unavailable at startup");
+            break;
+        }
+    }
+}
+
 // Demo upstream applications live on their own port, behind Envoy.
 app.MapWhen(ctx => ctx.Connection.LocalPort == appsPort, a => a.Run(DemoApps.Handle));
 
