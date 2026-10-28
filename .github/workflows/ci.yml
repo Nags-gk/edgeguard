@@ -40,10 +40,14 @@ jobs:
         run: pytest -q tests/integration --junitxml=integration.xml
       - name: Load smoke (k6, 300 rps for 20s, must stay error-free)
         run: |
-          docker restart eg && sleep 5
+          # Fresh gateway with the per-identity velocity thresholds raised: 3 load-test identities at
+          # 300 rps would otherwise (correctly) be flagged high-risk and contained by the risk engine.
+          docker rm -f eg
+          docker run -d --name eg -p 8080:8080 -e EdgeGuard__AdminKey=$EDGEGUARD_ADMIN_KEY \
+            -e EdgeGuard__Risk__MediumRequestsPer10s=10000000 -e EdgeGuard__Risk__HighRequestsPer10s=10000000 edgeguard:ci
+          for i in $(seq 1 60); do curl -sf localhost:8080/healthz && break; sleep 1; done
           docker run --rm --network host --user "$(id -u)" -v $PWD/loadtest:/s grafana/k6 run -q \
             -e RATE=300 -e DURATION=20s --summary-export=/s/ci-summary.json /s/k6.js
-        env: {}
       - name: Gateway logs
         if: failure()
         run: docker logs eg | tail -200
