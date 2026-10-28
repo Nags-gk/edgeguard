@@ -155,3 +155,17 @@ public class RiskReleaseTests
         Assert.Equal(RiskLevel.None, r.Assess("u", true).Level);
     }
 }
+
+public class RiskMemoryTests
+{
+    [Fact]
+    public void Idle_identities_are_evicted_when_the_cap_is_reached()
+    {
+        var clock = new FakeTimeProvider(DateTimeOffset.UtcNow);
+        var r = new RiskEngine(new RiskOptions(), clock) { MaxTrackedSubjects = 100 };
+        for (var i = 0; i < 100; i++) r.Assess($"old-{i}", true);
+        clock.Advance(TimeSpan.FromSeconds(61));
+        r.Assess("new", true);
+        Assert.Equal(1, r.TrackedSubjects);
+    }
+}

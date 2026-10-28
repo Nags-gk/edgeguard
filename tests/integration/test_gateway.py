@@ -12,13 +12,13 @@ import pytest
 import requests
 
 BASE = os.environ.get("EDGEGUARD_URL", "http://localhost:8080").rstrip("/")
-ADMIN_KEY = os.environ.get("EDGEGUARD_ADMIN_KEY", "localadmin")
+ADMIN_KEY = os.environ.get("EDGEGUARD_ADMIN_KEY", "")
 S = requests.Session()
 
 
-def token(persona, tamper=None):
+def token(persona, tamper=None, session=None):
     for _ in range(20):  # the token endpoint is deliberately rate limited
-        r = S.post(f"{BASE}/api/demo/token", json={"persona": persona, "tamper": tamper}, timeout=5)
+        r = S.post(f"{BASE}/api/demo/token", json={"persona": persona, "tamper": tamper, "session": session}, timeout=5)
         if r.status_code != 429:
             break
         time.sleep(0.1)
@@ -44,13 +44,6 @@ def reason(r):
         return r.json()["reason"]
     except Exception:
         return str(r.status_code)
-
-
-@pytest.fixture(autouse=True)
-def clean_risk_state():
-    """Each test starts with no accumulated session risk for the demo personas."""
-    for p in ("alice", "bob", "carol", "dave", "eve"):
-        S.delete(f"{BASE}/api/admin/risk/demo-{p}", headers={"x-admin-key": ADMIN_KEY}, timeout=5)
 
 
 # ---------------------------------------------------------------- policy matrix
@@ -128,7 +121,7 @@ def test_credentials_are_stripped_and_identity_headers_cannot_be_spoofed():
     h = headers_for(token("alice"))
     h.update({"x-eg-user": "admin", "x-eg-groups": "Finance", "x-eg-risk": "none"})
     seen = call("/apps/wiki", h).json()["seenByUpstream"]
-    assert seen["user"] == "demo-alice"
+    assert seen["user"].startswith("demo-alice-")
     assert seen["groups"] == "HR,Employees"
     assert seen["authorizationHeaderPresent"] is False
     assert seen["deviceTokenPresent"] is False
@@ -173,21 +166,30 @@ def test_admin_risk_api_requires_the_admin_key():
     assert r.status_code == 401
 
 
+def test_each_session_gets_an_isolated_identity():
+    a, b = token("alice"), token("alice")
+    assert a["subject"] != b["subject"]
+    assert token("alice", session=a["session"])["subject"] == a["subject"]
+
+
+@pytest.mark.skipif(ADMIN_KEY == "", reason="needs EDGEGUARD_ADMIN_KEY")
 def test_external_risk_signal_contains_then_releases_an_identity():
-    h = headers_for(token("alice"))
+    t = token("alice")
+    h = headers_for(t)
     assert call("/apps/hr", h).status_code == 200
     r = S.post(f"{BASE}/api/admin/risk", headers={"x-admin-key": ADMIN_KEY},
-               json={"subject": "demo-alice", "level": "High", "reason": "test: impossible travel", "ttlSeconds": 60}, timeout=5)
+               json={"subject": t["subject"], "level": "High", "reason": "test: impossible travel", "ttlSeconds": 60}, timeout=5)
     assert r.status_code == 200
     assert reason(call("/apps/hr", h)) == "policy_block"
-    assert S.delete(f"{BASE}/api/admin/risk/demo-alice", headers={"x-admin-key": ADMIN_KEY}, timeout=5).status_code == 204
+    assert S.delete(f"{BASE}/api/admin/risk/{t['subject']}", headers={"x-admin-key": ADMIN_KEY}, timeout=5).status_code == 204
     assert call("/apps/hr", h).status_code == 200
 
 
 def test_burst_escalates_risk_to_step_up_then_block():
-    h = headers_for(token("carol"))
+    t = token("carol")
+    h = headers_for(t)
     with cf.ThreadPoolExecutor(8) as ex:
         reasons = list(ex.map(lambda _: reason(call("/apps/hr", h)), range(80)))
     assert "policy_block" in reasons
-    decisions = S.get(f"{BASE}/api/decisions", params={"subject": "demo-carol", "limit": 200}, timeout=5).json()
+    decisions = S.get(f"{BASE}/api/decisions", params={"subject": t["subject"], "limit": 200}, timeout=5).json()
     assert {"medium", "high"} <= {d["risk"] for d in decisions}

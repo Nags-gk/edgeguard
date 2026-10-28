@@ -36,6 +36,7 @@ public sealed class RiskEngine
     public RiskSignal Assess(string subject, bool hasDevice)
     {
         var now = _time.GetUtcNow().ToUnixTimeMilliseconds();
+        if (_windows.Count >= MaxTrackedSubjects) EvictIdle(now);
         var w = _windows.GetOrAdd(subject, _ => new Window());
         int requests, denials;
         lock (w)
@@ -85,6 +86,27 @@ public sealed class RiskEngine
     public IReadOnlyDictionary<string, object> ExternalRiskSnapshot() =>
         _external.Where(kv => kv.Value.Until > _time.GetUtcNow())
                  .ToDictionary(kv => kv.Key, kv => (object)new { level = kv.Value.Level.ToString(), why = kv.Value.Why, until = kv.Value.Until });
+
+    /// <summary>Upper bound on per-identity windows held in memory (public demo mints many subjects).</summary>
+    public int MaxTrackedSubjects { get; init; } = 20_000;
+
+    public int TrackedSubjects => _windows.Count;
+
+    /// <summary>Drop identities with no activity in the last 60 s; their windows are empty anyway.</summary>
+    private void EvictIdle(long now)
+    {
+        foreach (var (key, w) in _windows)
+        {
+            bool idle;
+            lock (w)
+            {
+                Trim(w.Requests, now - 10_000);
+                Trim(w.Denials, now - 60_000);
+                idle = w.Requests.Count == 0 && w.Denials.Count == 0;
+            }
+            if (idle) _windows.TryRemove(key, out _);
+        }
+    }
 
     private static void Trim(Queue<long> q, long cutoff) { while (q.Count > 0 && q.Peek() < cutoff) q.Dequeue(); }
 }

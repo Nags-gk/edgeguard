@@ -106,8 +106,13 @@ api.MapGet("/api/personas", () => DemoPersonas.All.Select(p => new
 api.MapPost("/api/demo/token", (DemoTokenRequest r) =>
 {
     if (!demoEnabled) return Results.NotFound();
-    var p = DemoPersonas.Find(r.Persona ?? "");
-    if (p is null) return Results.BadRequest(new { error = "unknown persona" });
+    var persona = DemoPersonas.Find(r.Persona ?? "");
+    if (persona is null) return Results.BadRequest(new { error = "unknown persona" });
+    // Each visitor session gets its own subject, so one visitor's burst (and the risk it
+    // raises) never changes what another visitor sees for the same persona.
+    var session = r.Session is { Length: >= 6 and <= 32 } sid && sid.All(char.IsLetterOrDigit)
+        ? sid.ToLowerInvariant() : Guid.NewGuid().ToString("N")[..10];
+    var p = persona with { Subject = $"demo-{persona.Key}-{session}" };
     string access = r.Tamper switch
     {
         "expired" => demo.IssueUserToken(p, TimeSpan.FromMinutes(5), DateTimeOffset.UtcNow.AddHours(-1)),
@@ -115,7 +120,7 @@ api.MapPost("/api/demo/token", (DemoTokenRequest r) =>
         _ => demo.IssueUserToken(p, TimeSpan.FromMinutes(15)),
     };
     var device = p.DeviceId is null ? null : demo.IssueDeviceToken(p.DeviceId, p.DeviceCompliant, p.DeviceOs, TimeSpan.FromMinutes(15));
-    return Results.Ok(new { persona = p.Key, accessToken = access, deviceToken = device, expiresIn = 900 });
+    return Results.Ok(new { persona = p.Key, subject = p.Subject, session, accessToken = access, deviceToken = device, expiresIn = 900 });
 });
 
 api.MapGet("/api/decisions", (DecisionTelemetry t, int? limit, string? subject) =>
@@ -162,6 +167,6 @@ api.MapDelete("/api/admin/risk/{subject}", (HttpRequest req, string subject, Ris
 
 app.Run();
 
-public sealed record DemoTokenRequest(string? Persona, string? Tamper);
+public sealed record DemoTokenRequest(string? Persona, string? Tamper, string? Session);
 public sealed record RiskOverride(string Subject, string Level, string? Reason, int? TtlSeconds);
 public partial class Program;

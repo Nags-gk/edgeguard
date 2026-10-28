@@ -5,7 +5,7 @@ reaches a private app or an internet destination, Envoy asks a C#/.NET authoriza
 whether *this identity, on this device, at this risk level* may proceed. It is a small, working model of
 how a Zero Trust edge (Secure Web Gateway + private application access) makes per-request decisions.
 
-**Live demo:** _link added after deployment_ · **Stack:** Envoy 1.33 · C# / .NET 8 · gRPC · Microsoft Entra ID · Docker · Google Cloud Run · GitHub Actions · k6
+**Live demo:** https://edgeguard-txtjkjjmia-uc.a.run.app (demo personas work for anyone; *Sign in with Microsoft Entra ID* works for accounts in the EdgeGuard tenant) · **Stack:** Envoy 1.33 · C# / .NET 8 · gRPC · Microsoft Entra ID · Docker · Google Cloud Run · GitHub Actions · k6
 
 ![EdgeGuard console](docs/console.png)
 
@@ -41,8 +41,9 @@ flowchart LR
 
 | Check | Result |
 |---|---|
-| Unit tests (policy, identity incl. Entra token shapes, risk) | **52 passing** |
-| Black-box integration tests against the real container | **26 passing**, stable across repeated runs |
+| Unit tests (policy, identity incl. Entra token shapes, risk) | **53 passing** |
+| Black-box integration tests against the real container | **27 passing** locally and in CI; the same suite gates every Cloud Run rollout |
+| Live deployment, Microsoft Entra ID | Tenant signing keys loaded at startup; forged-key and cross-tenant tokens rejected in production (`bad_signature`, `untrusted_issuer`) |
 | Authorization overhead at 500 rps | **+0.7 ms p50** vs. Envoy alone (1.31 vs. 0.63 ms) |
 | `Check` latency inside the service | **0.105 ms p50 / 0.178 ms p99** (token cache on) |
 | Sustained load, 1.5 vCPU | **1,500 rps, 0 errors**, p99 39 ms |
@@ -114,6 +115,10 @@ deploy/                 container entrypoint, Cloud Run verified-rollout script
   independently, and it fails closed.
 - **Why cache token validation?** RSA verification is the most expensive step per request; caching by token
   hash, capped at the token's own expiry, cut `Check` time about 25%.
+- **Demo identities are per visitor.** Each browser session gets its own subject (`demo-alice-<session>`), so one
+  visitor's burst never changes what another visitor sees. Per-identity risk windows are capped and idle ones evicted.
+- **Entra keys load before traffic.** The first Entra request after a cold start used to fetch OIDC metadata inside
+  Envoy's 250 ms authorization budget and fail closed; the service now loads the tenant's keys before it listens.
 - **Risk state is per instance** (in memory). A multi-instance deployment would move it to a shared store;
   the demo runs a single Cloud Run instance.
 - **Simulated pieces:** the private apps, internet destinations and device-compliance attestation are

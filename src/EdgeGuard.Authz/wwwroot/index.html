@@ -35,7 +35,7 @@ pre{font:12px/1.45 var(--mono);white-space:pre-wrap;word-break:break-word;margin
 table{border-collapse:collapse;width:100%;font-size:12px}th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
 th{color:var(--muted);font-weight:600}
 td.c-allow{color:var(--ok);font-weight:600}td.c-deny,td.c-unauthenticated{color:var(--deny);font-weight:600}
-.feed{max-height:520px;overflow:auto}.feed table{min-width:520px}.feed td{font-family:var(--mono);font-size:11px}
+.feed{max-height:520px;overflow:auto}.feed table{min-width:520px}.feed td{font-family:var(--mono);font-size:11px;white-space:nowrap}
 .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
 .kpi{border:1px solid var(--line);border-radius:8px;padding:8px}.kpi .v{font-size:18px;font-weight:700}.kpi .l{font-size:11px;color:var(--muted)}
 .muted{color:var(--muted)}a{color:var(--accent)}
@@ -89,14 +89,14 @@ footer{padding:4px 24px 24px;color:var(--muted);font-size:12px;max-width:1500px;
     <section style="margin-top:16px">
       <h2>3 · Run the full access matrix</h2>
       <div class="row"><button id="matrix-btn" class="primary">Run every persona × destination</button><span class="muted" id="matrix-note"></span></div>
-      <div id="matrix"></div>
+      <div id="matrix" style="overflow-x:auto"></div>
     </section>
 
     <section style="margin-top:16px">
       <h2>4 · Simulate a compromised session</h2>
-      <p class="muted" style="margin-top:0">Fires 80 rapid requests as the selected persona at a forbidden app. Session risk climbs from velocity and repeated denials: medium risk demands MFA, high risk blocks everything.</p>
+      <p class="muted" style="margin-top:0">Your demo identities are private to this browser tab, so this only affects you. Fires 80 rapid requests as the selected persona at a forbidden app. Session risk climbs from velocity and repeated denials: medium risk demands MFA, high risk blocks everything.</p>
       <div class="row"><button id="burst-btn">Run burst</button><span id="burst-note" class="muted"></span></div>
-      <div id="burst"></div>
+      <div id="burst" style="overflow-x:auto"></div>
     </section>
   </div>
 
@@ -134,12 +134,15 @@ const TARGETS = [
 ];
 let personas = [], selected = "alice", entraToken = null, config = {};
 const tokenCache = new Map();
+const SESSION = (() => { try { const k = "eg-session"; let v = sessionStorage.getItem(k);
+  if (!v) { v = Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join(""); sessionStorage.setItem(k, v); }
+  return v; } catch { return Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, "0")).join(""); } })();
 
 async function demoToken(persona, tamper) {
   const key = persona + "|" + (tamper || "");
   const hit = tokenCache.get(key);
   if (hit && hit.until > Date.now()) return hit.t;
-  const r = await fetch("/api/demo/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ persona, tamper: tamper || null }) });
+  const r = await fetch("/api/demo/token", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ persona, tamper: tamper || null, session: SESSION }) });
   if (!r.ok) throw new Error("token endpoint " + r.status);
   const t = await r.json();
   tokenCache.set(key, { t, until: Date.now() + 10 * 60 * 1000 });
@@ -227,7 +230,7 @@ async function runBurst() {
     try { reason = (await r.json()).reason ?? "allow"; } catch {}
     counts[reason] = (counts[reason] || 0) + 1;
   }));
-  const subj = "demo-" + selected;
+  const subj = t.subject;
   const ev = await (await fetch(`/api/decisions?subject=${subj}&limit=80`)).json();
   const risks = {}; ev.forEach((e) => risks[e.risk] = (risks[e.risk] || 0) + 1);
   $("burst").innerHTML = `<table><tr><th>Outcome</th><th>Count</th></tr>${Object.entries(counts).map(([k, v]) => `<tr><td>${esc(k)}</td><td>${v}</td></tr>`).join("")}</table>
@@ -243,7 +246,7 @@ async function refresh() {
     $("k-p99").textContent = s.checkLatencyMs.p99.toFixed(2);
     $("k-cache").textContent = (s.tokenCacheHitRate * 100).toFixed(0) + "%";
     const allow = s.byVerdict.allow || 0; $("k-allow").style.width = (s.window ? (allow / s.window) * 100 : 0) + "%";
-    $("feed").innerHTML = d.map((e) => `<tr><td>${esc(e.ts.slice(11, 19))}</td><td>${esc(e.subject.replace("demo-", ""))}</td><td>${esc(e.path)}</td>
+    $("feed").innerHTML = d.map((e) => `<tr><td>${esc(e.ts.slice(11, 19))}</td><td>${esc(e.subject.startsWith("demo-") ? e.subject.split("-")[1] + (e.subject.endsWith(SESSION) ? " (you)" : "") : e.subject.slice(0, 8))}</td><td>${esc(e.path)}</td>
       <td class="c-${esc(e.verdict)}">${esc(e.verdict)}</td><td>${esc(e.reasonCode)}</td><td>${esc(e.risk)}</td></tr>`).join("");
   } catch {}
 }
